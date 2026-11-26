@@ -2,6 +2,8 @@ import { Outlet, useSearchParams } from "react-router";
 import type { Route } from "./+types/layout.app";
 import { Sidebar } from "~/components/sidebar";
 import { NotificationsPrototype } from "~/components/notifications-prototype";
+import { KnockFeedPrototype } from "~/components/knock-feed-prototype";
+import { getKnockPrototypeUser } from "~/lib/knock-prototype.server";
 import { DevUI } from "~/components/dev-ui";
 import { Toaster } from "sonner";
 import { getCurrentUserId, getDevCountry } from "~/lib/session";
@@ -186,7 +188,11 @@ export async function loader({ request }: Route.LoaderArgs) {
           course.courseId
         );
         const totalLessons = getTotalLessonCount(course.courseId);
-        const progress = calculateProgress(currentUserId, course.courseId, false);
+        const progress = calculateProgress(
+          currentUserId,
+          course.courseId,
+          false
+        );
         return {
           courseId: course.courseId,
           title: course.courseTitle,
@@ -199,7 +205,15 @@ export async function loader({ request }: Route.LoaderArgs) {
       })
     : [];
 
+  const knockPrototypeUser =
+    import.meta.env.DEV &&
+    currentUser &&
+    new URL(request.url).searchParams.get("variant") === "K"
+      ? await getKnockPrototypeUser(currentUser.id).catch(() => null)
+      : null;
+
   return {
+    knockPrototypeUser,
     users: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
     currentUser: currentUser
       ? {
@@ -220,6 +234,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 export default function AppLayout({ loaderData }: Route.ComponentProps) {
   const {
     users,
+    knockPrototypeUser,
     currentUser,
     recentCourses,
     devCountry,
@@ -236,12 +251,24 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     return <NotificationsPrototype sidebar={sidebar} variant={variant} />;
   }
 
+  const isKnockPrototype = import.meta.env.DEV && variant === "K";
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar {...sidebar} />
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
+    <div
+      className={isKnockPrototype ? undefined : "flex h-screen overflow-hidden"}
+    >
+      {isKnockPrototype ? (
+        <KnockFeedPrototype
+          credentials={knockPrototypeUser}
+          sidebar={sidebar}
+        />
+      ) : (
+        <>
+          <Sidebar {...sidebar} />
+          <main className="flex-1 overflow-y-auto">
+            <Outlet />
+          </main>
+        </>
+      )}
       <DevUI
         users={users}
         currentUser={currentUser}

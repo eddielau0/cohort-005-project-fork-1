@@ -29,7 +29,7 @@ import { Sidebar } from "~/components/sidebar";
 import { cn } from "~/lib/utils";
 
 const inboxPath = "/prototype/notifications";
-const samples = [
+export const samples = [
   {
     id: "question",
     message: "Your question in “Working with Branches” was answered.",
@@ -73,14 +73,23 @@ const samples = [
   },
 ];
 
-type Variant = "A" | "B";
+type Variant = "A" | "B" | "K";
+type LiveFeed = {
+  items: Array<(typeof samples)[number] & { target: string; read: boolean }>;
+  unread: number;
+  markRead: (id: string) => void;
+  status?: string;
+  controls?: React.ReactNode;
+};
 
 export function NotificationsPrototype({
   sidebar,
   variant,
+  live,
 }: {
   sidebar: ComponentProps<typeof Sidebar>;
   variant: Variant;
+  live?: LiveFeed;
 }) {
   const [readIds, setReadIds] = useState(["declined"]);
   const [empty, setEmpty] = useState(false);
@@ -90,9 +99,17 @@ export function NotificationsPrototype({
   const navigate = useNavigate();
   const navigationType = useNavigationType();
   const returnedRow = navigationType === "POP" ? lastOpened : null;
-  const open = variant === "A" && search.get("panel") === "open";
-  const visible = empty ? [] : samples;
-  const unread = visible.filter(({ id }) => !readIds.includes(id)).length;
+  const open = variant !== "B" && search.get("panel") === "open";
+  const visible =
+    live?.items ??
+    (empty
+      ? []
+      : samples.map((sample) => ({
+          ...sample,
+          target: sample.id,
+          read: readIds.includes(sample.id),
+        })));
+  const unread = live?.unread ?? visible.filter(({ read }) => !read).length;
   const countLabel = `${unread} unread`;
   const badge = unread > 0 && (
     <span
@@ -104,6 +121,7 @@ export function NotificationsPrototype({
   );
 
   function markRead(id: string) {
+    if (live) return live.markRead(id);
     setReadIds((current) =>
       current.includes(id) ? current : [...current, id]
     );
@@ -117,6 +135,7 @@ export function NotificationsPrototype({
   }
 
   useEffect(() => {
+    if (variant === "K") return;
     function handleKey(event: KeyboardEvent) {
       if (
         event.defaultPrevented ||
@@ -141,92 +160,86 @@ export function NotificationsPrototype({
     return () => window.removeEventListener("keydown", handleKey);
   }, [variant, navigate]);
 
-  const list =
-    visible.length === 0 ? (
-      <div className="flex flex-col items-center gap-2 p-8 text-center">
-        <Bell aria-hidden="true" className="size-5 text-muted-foreground" />
-        <p className="text-sm font-medium">No notifications yet</p>
-      </div>
-    ) : (
-      <ul className="divide-y">
-        {visible.map(({ id, message, time, icon: Icon }) => {
-          const read = readIds.includes(id);
-          return (
-            <li
-              key={id}
-              className={cn("flex items-start", !read && "bg-muted/65")}
-            >
-              <Link
-                id={`notification-${id}`}
-                to={`${inboxPath}/${id}?variant=${variant}#record-${id}`}
-                state={{ fromNotifications: true }}
-                onClick={(event) => {
-                  if (
-                    event.metaKey ||
-                    event.ctrlKey ||
-                    event.shiftKey ||
-                    event.altKey
-                  )
-                    return;
-                  markRead(id);
-                  setLastOpened(id);
-                }}
-                className="flex min-w-0 flex-1 items-start gap-3 rounded-md py-3 pr-2 pl-4 outline-offset-[-2px] hover:bg-muted focus-visible:outline-2"
-              >
-                <span className="rounded-md border bg-background p-1.5">
-                  <Icon aria-hidden="true" className="size-4" />
-                </span>
-                <span className="min-w-0 flex-1 space-y-1">
-                  <span
-                    className={cn(
-                      "block text-sm leading-snug",
-                      read ? "text-muted-foreground" : "font-semibold"
-                    )}
-                  >
-                    {message}
-                  </span>
-                  <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                    <span>{time}</span>
-                    {!read && (
-                      <span className="font-medium text-foreground">
-                        Unread
-                      </span>
-                    )}
-                  </span>
-                </span>
-                <ChevronRight
-                  aria-hidden="true"
-                  className="mt-1 size-4 shrink-0 text-muted-foreground"
-                />
-              </Link>
-              <button
-                type="button"
-                aria-label={`${read ? "Already read" : "Mark as read"}: ${message}`}
-                title={read ? "Already read" : "Mark as read"}
-                aria-disabled={read}
-                onClick={() => {
-                  if (!read) markRead(id);
-                }}
+  const list = live?.status ? (
+    <p role="status" className="p-6 text-center text-sm">
+      {live.status}
+    </p>
+  ) : visible.length === 0 ? (
+    <div className="flex flex-col items-center gap-2 p-8 text-center">
+      <Bell aria-hidden="true" className="size-5 text-muted-foreground" />
+      <p className="text-sm font-medium">No notifications yet</p>
+    </div>
+  ) : (
+    <ul className="divide-y">
+      {visible.map(({ id, target, message, time, read, icon: Icon }) => (
+        <li key={id} className={cn("flex items-start", !read && "bg-muted/65")}>
+          <Link
+            id={`notification-${id}`}
+            to={`${inboxPath}/${target}?variant=${variant}#record-${target}`}
+            state={{ fromNotifications: true }}
+            onClick={(event) => {
+              if (
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey
+              )
+                return;
+              markRead(id);
+              setLastOpened(id);
+            }}
+            className="flex min-w-0 flex-1 items-start gap-3 rounded-md py-3 pr-2 pl-4 outline-offset-[-2px] hover:bg-muted focus-visible:outline-2"
+          >
+            <span className="rounded-md border bg-background p-1.5">
+              <Icon aria-hidden="true" className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1 space-y-1">
+              <span
                 className={cn(
-                  "mr-2 mt-2 flex size-10 shrink-0 items-center justify-center rounded-md text-muted-foreground focus-visible:outline-2",
-                  !read &&
-                    "cursor-pointer hover:bg-accent hover:text-foreground"
+                  "block text-sm leading-snug",
+                  read ? "text-muted-foreground" : "font-semibold"
                 )}
               >
-                <Check aria-hidden="true" className="size-4" />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    );
+                {message}
+              </span>
+              <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                <span>{time}</span>
+                {!read && (
+                  <span className="font-medium text-foreground">Unread</span>
+                )}
+              </span>
+            </span>
+            <ChevronRight
+              aria-hidden="true"
+              className="mt-1 size-4 shrink-0 text-muted-foreground"
+            />
+          </Link>
+          <button
+            type="button"
+            aria-label={`${read ? "Already read" : "Mark as read"}: ${message}`}
+            title={read ? "Already read" : "Mark as read"}
+            aria-disabled={read}
+            onClick={() => {
+              if (!read) markRead(id);
+            }}
+            className={cn(
+              "mr-2 mt-2 flex size-10 shrink-0 items-center justify-center rounded-md text-muted-foreground focus-visible:outline-2",
+              !read && "cursor-pointer hover:bg-accent hover:text-foreground"
+            )}
+          >
+            <Check aria-hidden="true" className="size-4" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
     <div className="flex h-dvh overflow-hidden max-sm:flex-col">
       <Sidebar
         {...sidebar}
         notificationPrototype={
-          variant === "A"
+          variant !== "B"
             ? {
                 bell: (
                   <Popover.Root
@@ -332,45 +345,58 @@ export function NotificationsPrototype({
         role="group"
         className="fixed inset-x-2 bottom-3 z-20 mx-auto flex w-fit max-w-[calc(100vw-1rem)] flex-wrap items-center justify-center gap-1 rounded-xl border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-white shadow-lg"
       >
-        <span className="px-1 text-zinc-300">Prototype</span>
-        <button
-          type="button"
-          onClick={switchVariant}
-          aria-label="Previous variation"
-          className="grid size-8 cursor-pointer place-items-center rounded-md hover:bg-zinc-700 focus-visible:outline-2"
-        >
-          <ArrowLeft aria-hidden="true" className="size-4" />
-        </button>
-        <span className="min-w-20 text-center font-semibold">
-          {variant === "A" ? "A · Bell" : "B · Page"}
+        <span className="px-1 text-zinc-300">
+          {live ? "Knock prototype" : "Prototype"}
         </span>
-        <button
-          type="button"
-          onClick={switchVariant}
-          aria-label="Next variation"
-          className="grid size-8 cursor-pointer place-items-center rounded-md hover:bg-zinc-700 focus-visible:outline-2"
-        >
-          <ArrowRight aria-hidden="true" className="size-4" />
-        </button>
-        <button
-          type="button"
-          aria-pressed={empty}
-          onClick={() => setEmpty(!empty)}
-          className="min-h-8 cursor-pointer rounded-md px-2 hover:bg-zinc-700 aria-pressed:bg-zinc-700 focus-visible:outline-2"
-        >
-          Empty
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setEmpty(false);
-            setReadIds(["declined"]);
-            setLastOpened(null);
-          }}
-          className="min-h-8 cursor-pointer rounded-md px-2 hover:bg-zinc-700 focus-visible:outline-2"
-        >
-          Reset
-        </button>
+        {live ? (
+          <>
+            {live.controls}
+            <Link className="px-2 underline" to="/courses?variant=A">
+              Sample preview
+            </Link>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={switchVariant}
+              aria-label="Previous variation"
+              className="grid size-8 cursor-pointer place-items-center rounded-md hover:bg-zinc-700 focus-visible:outline-2"
+            >
+              <ArrowLeft aria-hidden="true" className="size-4" />
+            </button>
+            <span className="min-w-20 text-center font-semibold">
+              {variant === "A" ? "A · Bell" : "B · Page"}
+            </span>
+            <button
+              type="button"
+              onClick={switchVariant}
+              aria-label="Next variation"
+              className="grid size-8 cursor-pointer place-items-center rounded-md hover:bg-zinc-700 focus-visible:outline-2"
+            >
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </button>
+            <button
+              type="button"
+              aria-pressed={empty}
+              onClick={() => setEmpty(!empty)}
+              className="min-h-8 cursor-pointer rounded-md px-2 hover:bg-zinc-700 aria-pressed:bg-zinc-700 focus-visible:outline-2"
+            >
+              Empty
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmpty(false);
+                setReadIds(["declined"]);
+                setLastOpened(null);
+              }}
+              className="min-h-8 cursor-pointer rounded-md px-2 hover:bg-zinc-700 focus-visible:outline-2"
+            >
+              Reset
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -418,8 +444,8 @@ export function PrototypeNotificationPage({ target }: { target?: string }) {
     <section className="mx-auto max-w-3xl px-4 py-8 sm:px-8">
       <Link
         to={
-          variant === "A"
-            ? "/courses?variant=A&panel=open"
+          variant === "A" || variant === "K"
+            ? `/courses?variant=${variant}&panel=open`
             : `${inboxPath}?variant=B`
         }
         onClick={(event) => {
