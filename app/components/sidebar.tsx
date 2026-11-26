@@ -40,6 +40,7 @@ interface SidebarProps {
   currentUser: CurrentUser | null;
   recentCourses?: RecentCourse[];
   isTeamAdmin?: boolean;
+  notificationPrototype?: { bell?: React.ReactNode; pageLink?: React.ReactNode };
 }
 
 interface NavItem {
@@ -110,6 +111,7 @@ export function Sidebar({
   currentUser,
   recentCourses = [],
   isTeamAdmin = false,
+  notificationPrototype,
 }: SidebarProps) {
   const currentUserRole = currentUser?.role ?? null;
   const [isDark, setIsDark] = useState(false);
@@ -128,14 +130,29 @@ export function Sidebar({
   }
 
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-      <div className="flex h-14 items-center border-b border-sidebar-border px-4">
+    <aside
+      className={cn(
+        "flex h-screen w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground",
+        notificationPrototype &&
+          "max-sm:h-auto max-sm:w-full max-sm:border-r-0 max-sm:border-b"
+      )}
+    >
+      <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-4">
         <NavLink to="/" className="text-lg font-bold tracking-tight">
           Cadence
         </NavLink>
+        {notificationPrototype?.bell}
       </div>
 
-      <nav className="flex-1 space-y-1 p-3">
+      <nav
+        aria-label="Main navigation"
+        className={cn(
+          "flex-1 space-y-1 p-3",
+          notificationPrototype &&
+            "max-sm:flex max-sm:flex-wrap max-sm:gap-1 max-sm:space-y-0 max-sm:p-2"
+        )}
+      >
+        {notificationPrototype?.pageLink}
         {navItems
           .filter((item) => isVisible(item, currentUserRole))
           .map((item) => (
@@ -174,7 +191,12 @@ export function Sidebar({
       </nav>
 
       {recentCourses.length > 0 && (
-        <div className="border-t border-sidebar-border p-3">
+        <div
+          className={cn(
+            "border-t border-sidebar-border p-3",
+            notificationPrototype && "max-sm:hidden"
+          )}
+        >
           <div className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
             Recent Courses
           </div>
@@ -212,7 +234,12 @@ export function Sidebar({
         </div>
       )}
 
-      <div className="border-t border-sidebar-border p-3 space-y-1">
+      <div
+        className={cn(
+          "border-t border-sidebar-border p-3 space-y-1",
+          notificationPrototype && "max-sm:hidden"
+        )}
+      >
         <button
           onClick={toggleDarkMode}
           className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"

@@ -1,6 +1,7 @@
-import { Outlet } from "react-router";
+import { Outlet, useSearchParams } from "react-router";
 import type { Route } from "./+types/layout.app";
 import { Sidebar } from "~/components/sidebar";
+import { NotificationsPrototype } from "~/components/notifications-prototype";
 import { DevUI } from "~/components/dev-ui";
 import { Toaster } from "sonner";
 import { getCurrentUserId, getDevCountry } from "~/lib/session";
@@ -227,13 +228,17 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     isTeamAdmin: userIsTeamAdmin,
   } = loaderData;
 
+  const [search] = useSearchParams();
+  const variant = search.get("variant");
+  const sidebar = { currentUser, recentCourses, isTeamAdmin: userIsTeamAdmin };
+
+  if (import.meta.env.DEV && (variant === "A" || variant === "B")) {
+    return <NotificationsPrototype sidebar={sidebar} variant={variant} />;
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar
-        currentUser={currentUser}
-        recentCourses={recentCourses}
-        isTeamAdmin={userIsTeamAdmin}
-      />
+      <Sidebar {...sidebar} />
       <main className="flex-1 overflow-y-auto">
         <Outlet />
       </main>
